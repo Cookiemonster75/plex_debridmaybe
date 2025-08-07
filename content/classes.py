@@ -565,22 +565,22 @@ class media:
                     title = releases.rename(self.parentTitle)
                 elif self.type == 'episode':
                     title = releases.rename(self.grandparentTitle)
-            title = title.replace('[', '\[').replace(']', '\]')
+            title = title.replace('[', r'\[').replace(']', r'\]')
             if self.type == 'movie':
                 if regex.search(str(self.year), releases.rename(self.title.replace(str(self.year), '') + ' ' + str(self.year))):
                     title = title.replace('.' + str(self.year), '')
                     if year != "":
-                        return '[^A-Za-z0-9]*(' + title + ':?.)\(?\[?(' + str(year) + ')'
-                    return '[^A-Za-z0-9]*(' + title + ':?.)\(?\[?(' + str(self.year) + '|' + str(self.year - 1) + '|' + str(self.year + 1) + ')'
+                        return r'[^A-Za-z0-9]*(' + title + r':?.)\(?\[?(' + str(year) + ')'
+                    return r'[^A-Za-z0-9]*(' + title + r':?.)\(?\[?(' + str(self.year) + '|' + str(self.year - 1) + '|' + str(self.year + 1) + ')'
                 else:
                     title = title.replace('.' + str(self.year), '')
-                    return '[^A-Za-z0-9]*(' + title + ')'
+                    return r'[^A-Za-z0-9]*(' + title + ')'
             elif self.type == 'show':
                 title = title.replace('.' + str(self.year), '')
-                return '[^A-Za-z0-9]*(' + title + ':?.)(series.|[^A-Za-z0-9]+)?((\(?' + str(self.year) + '\)?.)|(complete.)|(seasons?.[0-9]+.[0-9]?[0-9]?.?)|(S[0-9]+.S?[0-9]?[0-9]?.?)|(S[0-9]+E[0-9]+))'
+                return r'[^A-Za-z0-9]*(' + title + r':?.)(series.|[^A-Za-z0-9]+)?((\(?' + str(self.year) + r'\)?.)|(complete.)|(seasons?.[0-9]+.[0-9]?[0-9]?.?)|(S[0-9]+.S?[0-9]?[0-9]?.?)|(S[0-9]+E[0-9]+))'
             elif self.type == 'season':
                 title = title.replace('.' + str(self.parentYear), '')
-                return '[^A-Za-z0-9]*(' + title + ':?.)(series.|[^A-Za-z0-9]+)?(\(?' + str(self.parentYear) + '\)?.)?(season.' + str(self.index) + '\.|season.' + str("{:02d}".format(self.index)) + '\.|S' + str("{:02d}".format(self.index)) + '\.)'
+                return r'[^A-Za-z0-9]*(' + title + r':?.)(series.|[^A-Za-z0-9]+)?(\(?' + str(self.parentYear) + r'\)?.)?(season.' + str(self.index) + r'\.|season.' + str("{:02d}".format(self.index)) + r'\.|S' + str("{:02d}".format(self.index)) + r'\.)'
             elif self.type == 'episode':
                 title = title.replace('.' + str(self.grandparentYear), '')
                 try:
@@ -588,15 +588,15 @@ class media:
                     airdate = datetime.datetime.strptime(
                         self.originallyAvailableAt, '%Y-%m-%d')
                     airdate_formats += [airdate.strftime(
-                        '(%y|%Y).*(%m|%b).*%d').replace("0", "0?")]
+                        r'(%y|%Y).*(%m|%b).*%d').replace("0", "0?")]
                     airdate_formats += [airdate.strftime(
-                        '%d.*(%m|%b).*(%Y|%y)').replace("0", "0?")]
+                        r'%d.*(%m|%b).*(%Y|%y)').replace("0", "0?")]
                     airdate_formats += [airdate.strftime(
-                        '(%m|%b).*%d.*(%Y|%y)').replace("0", "0?")]
+                        r'(%m|%b).*%d.*(%Y|%y)').replace("0", "0?")]
                     airdate_formats = "(" + ")|(".join(airdate_formats) + ")"
-                    return '[^A-Za-z0-9]*(' + title + ':?.)(series.)?(\(?' + str(self.grandparentYear) + '\)?.)?(S' + str("{:02d}".format(self.parentIndex)) + 'E' + str("{:02d}".format(self.index)) + '.|'+airdate_formats+')'
+                    return r'[^A-Za-z0-9]*(' + title + r':?.)(series.)?(\(?' + str(self.grandparentYear) + r'\)?.)?(S' + str("{:02d}".format(self.parentIndex)) + 'E' + str("{:02d}".format(self.index)) + r'.|'+airdate_formats+')'
                 except:
-                    return '[^A-Za-z0-9]*(' + title + ':?.)(series.)?(\(?' + str(self.grandparentYear) + '\)?.)?(S' + str("{:02d}".format(self.parentIndex)) + 'E' + str("{:02d}".format(self.index)) + '.)'
+                    return r'[^A-Za-z0-9]*(' + title + r':?.)(series.)?(\(?' + str(self.grandparentYear) + r'\)?.)?(S' + str("{:02d}".format(self.parentIndex)) + 'E' + str("{:02d}".format(self.index)) + r'.)'
         else:
             if hasattr(self, 'alternate_titles'):
                 title = '(' + '|'.join(self.alternate_titles) + ')'
@@ -609,25 +609,25 @@ class media:
                     title = releases.rename(self.parentTitle)
                 elif self.type == 'episode':
                     title = releases.rename(self.grandparentTitle)
-            title = title.replace('[', '\[').replace(']', '\]')
+            title = title.replace('[', r'\[').replace(']', r'\]')
             if self.type == 'movie':
                 title = title.replace('.' + str(self.year), '')
-                return '(.*?)(' + title + '.)(.*?)(' + str(self.year) + '|' + str(self.year - 1) + '|' + str(self.year + 1) + ')'
+                return r'(.*?)(' + title + '.)(.*?)(' + str(self.year) + '|' + str(self.year - 1) + '|' + str(self.year + 1) + ')'
             elif self.type == 'show':
                 title = title.replace('.' + str(self.year), '')
-                return '(.*?)(' + title + '.)(.*?)('+self.anime_count+'|(complete)|(seasons?[^0-9]?[0-9]+[^A-Z0-9]+S?[0-9]+)|(S[0-9]+[^A-Z0-9]+S?[0-9]+))'
+                return r'(.*?)(' + title + '.)(.*?)('+self.anime_count+'|(complete)|(seasons?[^0-9]?[0-9]+[^A-Z0-9]+S?[0-9]+)|(S[0-9]+[^A-Z0-9]+S?[0-9]+))'
             elif self.type == 'season':
                 n = self.index
                 roman = 'I' if n == 1 else 'II' if n == 2 else 'III' if n == 3 else 'IV' if n == 4 else 'V' if n == 5 else 'VI' if n == 6 else 'VII' if n == 7 else 'VIII' if n == 8 else 'IX' if n == 9 else 'X' if n == 10 else str(
                     n)
                 title = title.replace('.' + str(self.parentYear), '')
-                return '(.*?)(' + title + '.)(.*?)(season[^0-9]?0*' + str(self.index) + '|S0*' + str(self.index) + '(?!E?[0-9])|'+self.anime_count+'|[^A-Z0-9]'+roman+'[^A-Z0-9])'
+                return r'(.*?)(' + title + '.)(.*?)(season[^0-9]?0*' + str(self.index) + '|S0*' + str(self.index) + r'(?!E?[0-9])|'+self.anime_count+'|[^A-Z0-9]'+roman+'[^A-Z0-9])'
             elif self.type == 'episode':
                 n = self.parentIndex
                 roman = 'I' if n == 1 else 'II' if n == 2 else 'III' if n == 3 else 'IV' if n == 4 else 'V' if n == 5 else 'VI' if n == 6 else 'VII' if n == 7 else 'VIII' if n == 8 else 'IX' if n == 9 else 'X' if n == 10 else str(
                     n)
                 title = title.replace('.' + str(self.grandparentYear), '')
-                return '(.*?)(' + title + '.)(.*?)((?<!part)[^0-9A-RT-Z\[]0*('+str(self.parentIndex)+'|'+roman+')[^0-9A-DF-Z\[]0*'+str(self.index)+'(?![A-Z0-9]|\])|(?<!part)[^0-9A-Z\[]0*'+self.anime_count+'(?![A-Z0-9]|\]))'
+                return r'(.*?)(' + title + r'.)(.*?)((?<!part)[^0-9A-RT-Z\[]0*('+str(self.parentIndex)+'|'+roman+r')[^0-9A-DF-Z\[]0*'+str(self.index)+r'(?![A-Z0-9]|\])|(?<!part)[^0-9A-Z\[]0*'+self.anime_count+r'(?![A-Z0-9]|\]))'
 
     def isanime(self):
         if 'anime' in self.genre():

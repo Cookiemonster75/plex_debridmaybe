@@ -40,10 +40,13 @@ def get(url):
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36','authorization': 'Bearer ' + api_key}
     response = None
     try:
-        response = session.get(url, headers=headers)
+        response = session.get(url, headers=headers, timeout=60)
         logerror(response)
         response = json.loads(response.content, object_hook=lambda d: SimpleNamespace(**d))
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        ui_print("[realdebrid] error: (request exception): " + str(e), debug=ui_settings.debug)
+        response = None
+    except json.JSONDecodeError as e:
         ui_print("[realdebrid] error: (json exception): " + str(e), debug=ui_settings.debug)
         response = None
     return response
@@ -54,10 +57,13 @@ def post(url, data):
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36','authorization': 'Bearer ' + api_key}
     response = None
     try:
-        response = session.post(url, headers=headers, data=data)
+        response = session.post(url, headers=headers, data=data, timeout=60)
         logerror(response)
         response = json.loads(response.content, object_hook=lambda d: SimpleNamespace(**d))
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        ui_print("[realdebrid] error: (request exception): " + str(e), debug=ui_settings.debug)
+        response = None
+    except json.JSONDecodeError as e:
         if hasattr(response,"status_code"):
             if response.status_code >= 300:
                 ui_print("[realdebrid] error: (json exception): " + str(e), debug=ui_settings.debug)
@@ -70,9 +76,9 @@ def post(url, data):
 def delete(url):
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36','authorization': 'Bearer ' + api_key}
     try:
-        requests.delete(url, headers=headers)
+        requests.delete(url, headers=headers, timeout=60)
         # time.sleep(1)
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         ui_print("[realdebrid] error: (delete exception): " + str(e), debug=ui_settings.debug)
         None
     return None

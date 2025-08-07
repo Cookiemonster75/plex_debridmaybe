@@ -34,17 +34,23 @@ def get(url, timeout=60):
         logerror(response)
         response = json.loads(response.content, object_hook=lambda d: SimpleNamespace(**d))
         return response
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        ui_print("plex error: (request exception): " + str(e), debug=ui_settings.debug)
+        return None
+    except json.JSONDecodeError as e:
         ui_print("plex error: (json exception): " + str(e), debug=ui_settings.debug)
         return None
 
 def post(url, data):
     try:
-        response = session.post(url, data=data, headers=headers)
+        response = session.post(url, data=data, headers=headers, timeout=60)
         logerror(response)
         response = json.loads(response.content, object_hook=lambda d: SimpleNamespace(**d))
         return response
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        ui_print("plex error: (request exception): " + str(e), debug=ui_settings.debug)
+        return None
+    except json.JSONDecodeError as e:
         ui_print("plex error: (json exception): " + str(e), debug=ui_settings.debug)
         return None
 
@@ -102,19 +108,19 @@ class watchlist(classes.watchlist):
                 for user in item.user:
                     url = 'https://metadata.provider.plex.tv/actions/removeFromWatchlist?ratingKey=' + item.ratingKey + '&X-Plex-Token=' + user[1]
                     try:
-                        response = session.put(url, data={'ratingKey': item.ratingKey})
+                        response = session.put(url, data={'ratingKey': item.ratingKey}, timeout=60)
                         ui_print('[plex] item: "' + item.title + '" removed from ' + user[0] + '`s watchlist')
-                    except:
-                        ui_print('[plex] error: item "' + item.title + '" couldnt be removed from ' + user[0] + '`s watchlist')
+                    except requests.exceptions.RequestException as e:
+                        ui_print('[plex] error: item "' + item.title + '" couldnt be removed from ' + user[0] + '`s watchlist. Error: ' + str(e))
                 if not self == []:
                     self.data.remove(item)
             else:
                 url = 'https://metadata.provider.plex.tv/actions/removeFromWatchlist?ratingKey=' + item.ratingKey + '&X-Plex-Token=' + item.user[1]
                 try:
-                    response = session.put(url, data={'ratingKey': item.ratingKey})
+                    response = session.put(url, data={'ratingKey': item.ratingKey}, timeout=60)
                     ui_print('[plex] item: "' + item.title + '" removed from ' + item.user[0] + '`s watchlist')
-                except:
-                    ui_print('[plex] error: item "' + item.title + '" couldnt be removed from ' + user[0] + '`s watchlist')
+                except requests.exceptions.RequestException as e:
+                    ui_print('[plex] error: item "' + item.title + '" couldnt be removed from ' + user[0] + '`s watchlist. Error: ' + str(e))
                 if not self == []:
                     self.data.remove(item)
 
@@ -122,7 +128,11 @@ class watchlist(classes.watchlist):
         ui_print('[plex] item: "' + item.title + '" added to ' + user[0] + '`s watchlist')
         url = 'https://metadata.provider.plex.tv/actions/addToWatchlist?ratingKey=' + item.ratingKey + '&X-Plex-Token=' + \
                 user[1]
-        response = session.put(url, data={'ratingKey': item.ratingKey})
+        try:
+            response = session.put(url, data={'ratingKey': item.ratingKey}, timeout=60)
+        except requests.exceptions.RequestException as e:
+            ui_print('[plex] error: item "' + item.title + '" couldnt be added to ' + user[0] + '`s watchlist. Error: ' + str(e))
+            return
         if item.type == 'show':
             self.data.append(show(item.ratingKey))
         elif item.type == 'movie':
