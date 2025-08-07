@@ -16,7 +16,11 @@ def get(url):
         response = json.loads(
             response.content, object_hook=lambda d: SimpleNamespace(**d))
         return response
-    except:
+    except requests.exceptions.RequestException as e:
+        ui_print("[torrentio] error: (request exception): " + str(e), debug=ui_settings.debug)
+        return None
+    except json.JSONDecodeError as e:
+        ui_print("[torrentio] error: (json exception): " + str(e), debug=ui_settings.debug)
         return None
 
 
@@ -59,20 +63,20 @@ def setup(cls, new=False):
 
 
 def _get_imdb_id(query, type):
-    if regex.search(r'(tt[0-9]+)', query, regex.I):
-        return regex.search(r'(tt[0-9]+)', query, regex.I).group(), type
-
-    original_type = type
     try:
-        if type == "show":
-            url = "https://v3-cinemeta.strem.io/catalog/series/top/search=" + query + ".json"
-            meta = get(url)
-        else:
-            url = "https://v3-cinemeta.strem.io/catalog/movie/top/search=" + query + ".json"
-            meta = get(url)
-        return meta.metas[0].imdb_id, type
-    except:
+        if regex.search(r'(tt[0-9]+)', query, regex.I):
+            return regex.search(r'(tt[0-9]+)', query, regex.I).group(), type
+
+        original_type = type
         try:
+            if type == "show":
+                url = "https://v3-cinemeta.strem.io/catalog/series/top/search=" + query + ".json"
+                meta = get(url)
+            else:
+                url = "https://v3-cinemeta.strem.io/catalog/movie/top/search=" + query + ".json"
+                meta = get(url)
+            return meta.metas[0].imdb_id, type
+        except:
             if original_type == "movie":
                 type = "show"
                 url = "https://v3-cinemeta.strem.io/catalog/series/top/search=" + query + ".json"
@@ -82,32 +86,36 @@ def _get_imdb_id(query, type):
                 url = "https://v3-cinemeta.strem.io/catalog/movie/top/search=" + query + ".json"
                 meta = get(url)
             return meta.metas[0].imdb_id, type
-        except:
-            ui_print('[torrentio] error: could not find IMDB ID')
-            return None, None
+    except Exception as e:
+        ui_print('[torrentio] error: could not find IMDB ID: ' + str(e), debug=ui_settings.debug)
+        return None, None
 
 def _get_streams(imdb_id, type, altquery, opts):
-    if type == "show":
-        s = (regex.search(r'(?<=S)([0-9]+)', altquery, regex.I).group()
-             if regex.search(r'(?<=S)([0-9]+)', altquery, regex.I) else None)
-        e = (regex.search(r'(?<=E)([0-9]+)', altquery, regex.I).group()
-             if regex.search(r'(?<=E)([0-9]+)', altquery, regex.I) else None)
-        if s is None or int(s) == 0:
-            s = 1
-        if e is None or int(e) == 0:
-            e = 1
-        url = f'https://torrentio.strem.fun/{opts}{"/" if opts else ""}stream/series/{imdb_id}:{s}:{e}.json'
-        return get(url)
+    try:
+        if type == "show":
+            s = (regex.search(r'(?<=S)([0-9]+)', altquery, regex.I).group()
+                 if regex.search(r'(?<=S)([0-9]+)', altquery, regex.I) else None)
+            e = (regex.search(r'(?<=E)([0-9]+)', altquery, regex.I).group()
+                 if regex.search(r'(?<=E)([0-9]+)', altquery, regex.I) else None)
+            if s is None or int(s) == 0:
+                s = 1
+            if e is None or int(e) == 0:
+                e = 1
+            url = f'https://torrentio.strem.fun/{opts}{"/" if opts else ""}stream/series/{imdb_id}:{s}:{e}.json'
+            return get(url)
 
-    url = f'https://torrentio.strem.fun/{opts}{"/" if opts else ""}stream/movie/{imdb_id}.json'
-    response = get(url)
-    if not hasattr(response, "streams") or not response.streams:
-        # If no movie streams found, try searching for it as a show
-        s = 1
-        e = 1
-        url = f'https://torrentio.strem.fun/{opts}{"/" if opts else ""}stream/series/{imdb_id}:{s}:{e}.json'
-        return get(url)
-    return response
+        url = f'https://torrentio.strem.fun/{opts}{"/" if opts else ""}stream/movie/{imdb_id}.json'
+        response = get(url)
+        if not hasattr(response, "streams") or not response.streams:
+            # If no movie streams found, try searching for it as a show
+            s = 1
+            e = 1
+            url = f'https://torrentio.strem.fun/{opts}{"/" if opts else ""}stream/series/{imdb_id}:{s}:{e}.json'
+            return get(url)
+        return response
+    except Exception as e:
+        ui_print('[torrentio] error: could not get streams: ' + str(e), debug=ui_settings.debug)
+        return None
 
 def _parse_stream(result):
     try:
@@ -127,7 +135,8 @@ def _parse_stream(result):
 
         return releases.release(
             '[torrentio: '+source+']', 'torrent', title, [], size, links, seeds)
-    except:
+    except Exception as e:
+        ui_print('[torrentio] error: could not parse stream: ' + str(e), debug=ui_settings.debug)
         return None
 
 
