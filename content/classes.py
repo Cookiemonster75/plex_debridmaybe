@@ -1560,8 +1560,8 @@ class media:
                 files += episode.files()
         elif self.type == 'episode':
             if self.isanime():
-                files += ['[^A-DF-Z0-9\[]0*('+self.anime_count +
-                          '|'+str(self.index)+')(?![A-Z0-9]|\])']
+                files += [r'[^A-DF-Z0-9\[]0*('+self.anime_count +
+                          '|'+str(self.index)+r')(?![A-Z0-9]|\])']
             else:
                 files += ['S' + str("{:02d}".format(self.parentIndex)) +
                           'E' + str("{:02d}".format(self.index)) + '']
