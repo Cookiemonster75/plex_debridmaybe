@@ -2,12 +2,19 @@
 from base import *
 from ui.ui_print import *
 import releases
+import urllib.parse
+from torrentio_parser import parse_stream
 
 name = "torrentio"
 
 default_opts = "https://torrentio.strem.fun/sort=qualitysize|qualityfilter=480p,scr,cam/manifest.json"
 
 session = custom_session()
+
+
+def cinemeta_url(type_, query):
+    return "https://v3-cinemeta.strem.io/catalog/" + type_ + "/top/search=" + \
+        urllib.parse.quote(query, safe='') + ".json"
 
 
 def get(url):
@@ -85,10 +92,10 @@ def scrape(query, altquery):
         plain_text = copy.deepcopy(query)
         try:
             if type == "show":
-                url = "https://v3-cinemeta.strem.io/catalog/series/top/search=" + query + ".json"
+                url = cinemeta_url("series", query)
                 meta = get(url)
             else:
-                url = "https://v3-cinemeta.strem.io/catalog/movie/top/search=" + query + ".json"
+                url = cinemeta_url("movie", query)
                 meta = get(url)
             query = meta.metas[0].imdb_id
         except:
@@ -97,11 +104,11 @@ def scrape(query, altquery):
                     type = "show"
                     s = 1
                     e = 1
-                    url = "https://v3-cinemeta.strem.io/catalog/series/top/search=" + query + ".json"
+                    url = cinemeta_url("series", query)
                     meta = get(url)
                 else:
                     type = "movie"
-                    url = "https://v3-cinemeta.strem.io/catalog/movie/top/search=" + query + ".json"
+                    url = cinemeta_url("movie", query)
                     meta = get(url)
                 query = meta.metas[0].imdb_id
             except:
@@ -117,7 +124,7 @@ def scrape(query, altquery):
             e = 1
             if plain_text != "":
                 try:
-                    url = "https://v3-cinemeta.strem.io/catalog/series/top/search=" + plain_text + ".json"
+                    url = cinemeta_url("series", plain_text)
                     meta = get(url)
                     query = meta.metas[0].imdb_id
                 except:
@@ -140,17 +147,9 @@ def scrape(query, altquery):
                  ' ') + '" - ' + response.streams[0].title.replace('\n', ' '))
         return scraped_releases
     for result in response.streams:
-        try:
-            title = result.title.split('\n')[0].replace(' ', '.')
-            size = (float(regex.search(r'(?<=💾 )([0-9]+.?[0-9]+)(?= GB)', result.title).group()) if regex.search(r'(?<=💾 )([0-9]+.?[0-9]+)(?= GB)', result.title) else float(
-                regex.search(r'(?<=💾 )([0-9]+.?[0-9]+)(?= MB)', result.title).group())/1000 if regex.search(r'(?<=💾 )([0-9]+.?[0-9]+)(?= MB)', result.title) else 0)
-            links = ['magnet:?xt=urn:btih:' + result.infoHash + '&dn=&tr=']
-            seeds = (int(regex.search(r'(?<=👤 )([0-9]+)', result.title).group(
-            )) if regex.search(r'(?<=👤 )([1-9]+)', result.title) else 0)
-            source = ((regex.search(r'(?<=⚙️ )(.*)(?=\n|$)', result.title).group())
-                      if regex.search(r'(?<=⚙️ )(.*)(?=\n|$)', result.title) else "unknown")
-            scraped_releases += [releases.release(
-                '[torrentio: '+source+']', 'torrent', title, [], size, links, seeds)]
-        except:
+        parsed = parse_stream(result)
+        if parsed is None:
             continue
+        scraped_releases += [releases.release(
+            '[torrentio: ' + parsed['source'] + ']', 'torrent', parsed['title'], [], parsed['size'], [parsed['link']], parsed['seeds'])]
     return scraped_releases
