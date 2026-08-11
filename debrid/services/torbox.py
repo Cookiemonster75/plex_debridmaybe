@@ -14,6 +14,33 @@ api_key = os.getenv("TORBOX_API_KEY", "") or ""
 # Define Variables
 session = requests.Session()
 
+# cache of torrent hashes that are already present in the user's torbox account,
+# used to skip adding the same release twice. Refreshed at most once every 5 minutes.
+existing_torrent_hashes = None
+existing_torrent_hashes_time = 0
+
+
+def get_existing_hashes(force=False):
+    global existing_torrent_hashes, existing_torrent_hashes_time
+    if not force and existing_torrent_hashes is not None and (time.time() - existing_torrent_hashes_time) < 300:
+        return existing_torrent_hashes
+    response = get('https://api.torbox.app/v1/api/torrents/mylist?per_page=1000')
+    hashes = set()
+    if response is not None and getattr(response, 'data', None) is not None:
+        for torrent in response.data:
+            if getattr(torrent, 'hash', None):
+                hashes.add(str(torrent.hash).lower())
+            for alt in (getattr(torrent, 'alternative_hashes', None) or []):
+                if isinstance(alt, str) and alt:
+                    hashes.add(alt.lower())
+        existing_torrent_hashes = hashes
+        existing_torrent_hashes_time = time.time()
+    else:
+        # could not refresh - fall back to the last known list so we never re-add something we know about
+        hashes = existing_torrent_hashes if existing_torrent_hashes is not None else set()
+    return hashes
+
+
 def setup(cls, new=False):
     from debrid.services import setup
     setup(cls,new)
@@ -21,7 +48,7 @@ def setup(cls, new=False):
 # Error Log
 def logerror(response):
     if not response.status_code in [200,201,204]:
-        ui_print("[torbox] error: (" + str(response.status_code) + ") " + str(response.content), debug=ui_settings.debug)
+        ui_print("[torbox] error: (" + str(response.status_code) + ") " + str(response.content))
     if response.status_code == 401:
         ui_print("[torbox] error: (401 unauthorized): torbox api key does not seem to work. check your torbox settings.")
 
@@ -49,7 +76,7 @@ def post(url, data):
         logerror(response)
         response = json.loads(response.content, object_hook=lambda d: SimpleNamespace(**d))
     except Exception as e:
-        ui_print("[torbox] error: (json exception): " + str(e), debug=ui_settings.debug)
+        ui_print("[torbox] error: (json exception): " + str(e))
         response = None
     return response
 
@@ -102,42 +129,65 @@ def download(element, stream=True, query='', force=False):
     wanted = [query]
     if not isinstance(element, releases.release):
         wanted = element.files()
+    existing_hashes = get_existing_hashes()
     for release in cached[:]:
         # if release matches query
         if regex.match(r'(' + query + ')', release.title, regex.I) or force:
+            # skip releases that are already present in the user's torbox account
+            if (getattr(release, 'hash', '') or '') and str(release.hash).lower() in existing_hashes:
+                ui_print('[torbox] release already in torbox account, skipping: ' + release.title)
+                return True
             if stream:
+                attempted = False
                 for version in release.files:
                     if hasattr(version, 'files'):
                         if len(version.files) > 0 and version.wanted > len(wanted) / 2 or force:
+                            attempted = True
                             try:
-                                response = post('https://api.torbox.app/v1/api/torrents/asynccreatetorrent',
-                                                {'magnet': str(release.download[0]), 'seed': '3', 'allow_zip': '0', 'as_queued': '1'})
-                                torrent_id = str(response.data.torrent_id)
-                            except:
-                                ui_print('[torbox] error: could not add magnet for release: ' + release.title, ui_settings.debug)
-                                continue
+                                response = post('https://api.torbox.app/v1/api/torrents/createtorrent',
+                                                {'magnet': str(release.download[0]), 'seed': '3', 'allow_zip': '0', 'as_queued': '0'})
+                                if response is None:
+                                    raise Exception('torbox request failed')
+                                if not getattr(response, 'success', False):
+                                    raise Exception('torbox rejected the magnet: ' + str(getattr(response, 'error', 'unknown error')))
+                            except Exception as e:
+                                ui_print('[torbox] error: could not add magnet for release: ' + release.title + ' - ' + str(e))
+                                break
                             release.files = [version]
+                            if existing_torrent_hashes is not None:
+                                existing_torrent_hashes.add(str(release.hash).lower())
                             ui_print('[torbox] adding cached release: ' + release.title)
                             return True
                 # cached release without a usable file version - add the magnet anyway
-                try:
-                    response = post('https://api.torbox.app/v1/api/torrents/asynccreatetorrent',
-                                    {'magnet': str(release.download[0]), 'seed': '3', 'allow_zip': '0', 'as_queued': '1'})
-                    torrent_id = str(response.data.torrent_id)
-                    ui_print('[torbox] adding cached release: ' + release.title)
-                    return True
-                except:
-                    ui_print('[torbox] error: could not add magnet for release: ' + release.title, ui_settings.debug)
-                    continue
+                if not attempted:
+                    try:
+                        response = post('https://api.torbox.app/v1/api/torrents/createtorrent',
+                                        {'magnet': str(release.download[0]), 'seed': '3', 'allow_zip': '0', 'as_queued': '0'})
+                        if response is None:
+                            raise Exception('torbox request failed')
+                        if not getattr(response, 'success', False):
+                            raise Exception('torbox rejected the magnet: ' + str(getattr(response, 'error', 'unknown error')))
+                        if existing_torrent_hashes is not None:
+                            existing_torrent_hashes.add(str(release.hash).lower())
+                        ui_print('[torbox] adding cached release: ' + release.title)
+                        return True
+                    except Exception as e:
+                        ui_print('[torbox] error: could not add magnet for release: ' + release.title + ' - ' + str(e))
+                        continue
             else:
                 try:
-                    response = post('https://api.torbox.app/v1/api/torrents/asynccreatetorrent',
-                                    {'magnet': str(release.download[0]), 'seed': '3', 'allow_zip': '0', 'as_queued': '1'})
-                    torrent_id = str(response.data.torrent_id)
+                    response = post('https://api.torbox.app/v1/api/torrents/createtorrent',
+                                    {'magnet': str(release.download[0]), 'seed': '3', 'allow_zip': '0', 'as_queued': '0'})
+                    if response is None:
+                        raise Exception('torbox request failed')
+                    if not getattr(response, 'success', False):
+                        raise Exception('torbox rejected the magnet: ' + str(getattr(response, 'error', 'unknown error')))
+                    if existing_torrent_hashes is not None:
+                        existing_torrent_hashes.add(str(release.hash).lower())
                     ui_print('[torbox] adding uncached release: ' + release.title)
                     return True
-                except:
-                    ui_print('[torbox] error: could not add magnet for release: ' + release.title, ui_settings.debug)
+                except Exception as e:
+                    ui_print('[torbox] error: could not add magnet for release: ' + release.title + ' - ' + str(e))
                     continue
     return False
 
@@ -170,7 +220,8 @@ def check(element, force=False):
                 release_hash = release.hash.lower()
                 if hasattr(response.data, release_hash):
                     response_attr = getattr(response.data, release_hash)
-                    if getattr(response_attr, 'cached', False):
+                    if response_attr is not None:
+                        # torbox only returns hashes that are cached in the checkcached response - presence means cached
                         release.cached += ['TB']
                         if hasattr(response_attr, 'files') and response_attr.files is not None:
                             version_files = []

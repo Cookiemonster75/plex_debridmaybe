@@ -10,6 +10,7 @@ name = "torrentio"
 default_opts = "https://torrentio.strem.fun/sort=qualitysize|qualityfilter=480p,scr,cam/manifest.json"
 
 session = custom_session()
+session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'})
 
 
 def cinemeta_url(type_, query):
@@ -139,6 +140,8 @@ def scrape(query, altquery):
         try:
             if not response == None:
                 ui_print('[torrentio] error: ' + str(response))
+            else:
+                ui_print('[torrentio] error: request failed or returned no JSON', debug=ui_settings.debug)
         except:
             ui_print('[torrentio] error: unknown error')
         return scraped_releases
