@@ -514,6 +514,8 @@ class library(classes.library):
                             else:
                                 folders += [requests.utils.quote(location.path)]
                         paths += [[section_.key,folders]]
+                if len(paths) == 0:
+                    ui_print('[plex] error: could not refresh ' + element_type + ' library - none of the configured refresh section/s match this server (configured: ' + '","'.join(library.refresh.sections) + '). re-run the "Plex Libraries" update service setup to pick the current section numbers.')
                 delay = 2
                 try:
                     delay = float(library.refresh.delay)
@@ -802,7 +804,7 @@ class library(classes.library):
                 continue
             section_response = []
             for type in types:
-                url = library.url + '/library/sections/' + section + '/all?type=' + type + '&X-Plex-Token=' + users[0][1]
+                url = library.url + '/library/sections/' + section + '/all?type=' + type + '&includeGuids=1&X-Plex-Token=' + users[0][1]
                 response = get(url)
                 if hasattr(response, 'MediaContainer'):
                     if hasattr(response.MediaContainer, 'Metadata'):

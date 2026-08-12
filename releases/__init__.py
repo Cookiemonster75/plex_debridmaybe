@@ -1392,8 +1392,6 @@ class sort:
 
     def __new__(self, scraped_releases: list, version: version,doprint=True):
         if len(scraped_releases) > 0:
-            for rule in reversed(sort.always_on_rules):
-                rule.apply(scraped_releases)
             for rule in reversed(version.rules):
                 for subrule in sort.version.rule.__subclasses__():
                     if subrule.name == rule[0]:
@@ -1404,6 +1402,12 @@ class sort:
                 except:
                     ui_print('error: there seems to be an undefined rule in your version settings. skipping this rule.')
                     continue
+            # wanted/unwanted are always-on preferences: apply them last so a release that
+            # matches more wanted files (e.g. a full season pack vs a single episode of the
+            # same season) always ranks above one that matches fewer, regardless of the
+            # version's seeders/size preferences reordering the list.
+            for rule in reversed(sort.always_on_rules):
+                rule.apply(scraped_releases)
             if doprint:
                 ui_print('sorting releases for version [' + version.name + '] ... done - found ' + str(len(scraped_releases)) + ' releases')
         return scraped_releases

@@ -281,21 +281,21 @@ class media:
             if not self.type == other.type:
                 return False
             if self.type == 'movie' or self.type == 'show':
-                if hasattr(self, "EID") and hasattr(other, "EID"):
+                if hasattr(self, "EID") and hasattr(other, "EID") and len(self.EID) > 0 and len(other.EID) > 0:
                     for EID in self.EID:
                         if EID in other.EID:
                             return True
                     return False
                 return self.guid == other.guid
             elif self.type == 'season':
-                if hasattr(self, "parentEID") and hasattr(other, "parentEID"):
+                if hasattr(self, "parentEID") and hasattr(other, "parentEID") and len(self.parentEID) > 0 and len(other.parentEID) > 0:
                     for EID in self.parentEID:
                         if EID in other.parentEID and self.index == other.index:
                             return True
                     return False
                 return self.parentGuid == other.parentGuid and self.index == other.index
             elif self.type == 'episode':
-                if hasattr(self, "grandparentEID") and hasattr(other, "grandparentEID"):
+                if hasattr(self, "grandparentEID") and hasattr(other, "grandparentEID") and len(self.grandparentEID) > 0 and len(other.grandparentEID) > 0:
                     for EID in self.grandparentEID:
                         if EID in other.grandparentEID and self.parentIndex == other.parentIndex and self.index == other.index:
                             return True
@@ -947,16 +947,38 @@ class media:
     def watched(self):
         return ignore.check(self)
 
+    def originally_available_at(self):
+        # some library/watchlist sources omit the original air date (e.g. unaired
+        # seasons), which would crash the release check below; fall back to
+        # first_aired if present, otherwise return None so the caller can treat
+        # the item as released instead of silently dropping it
+        originally_available_at = getattr(self, "originallyAvailableAt", None)
+        if originally_available_at:
+            return originally_available_at
+        first_aired = getattr(self, "first_aired", None)
+        if not first_aired:
+            return None
+        for fmt in ('%Y-%m-%dT%H:%M:%S.000Z', '%Y-%m-%d'):
+            try:
+                return datetime.datetime.strptime(first_aired, fmt).strftime('%Y-%m-%d')
+            except Exception:
+                continue
+        return None
+
     def released(self):
         try:
+            originally_available_at = self.originally_available_at()
+            if not originally_available_at:
+                # no release date available for this item - assume it is released
+                return True
             released = datetime.datetime.utcnow(
-            ) - datetime.datetime.strptime(self.originallyAvailableAt, '%Y-%m-%d')
+            ) - datetime.datetime.strptime(originally_available_at, '%Y-%m-%d')
             if hasattr(self, "offset_airtime"):
                 smallest_offset = 0
                 for offset in self.offset_airtime:
                     if float(offset) < smallest_offset or smallest_offset == 0:
                         smallest_offset = float(offset)
-                released = datetime.datetime.utcnow() - datetime.datetime.strptime(self.originallyAvailableAt,
+                released = datetime.datetime.utcnow() - datetime.datetime.strptime(originally_available_at,
                                                                                    '%Y-%m-%d') - datetime.timedelta(hours=float(smallest_offset))
             if self.type == 'movie':
                 if released.days >= -30 and released.days <= 180:
@@ -1067,8 +1089,11 @@ class media:
                          str(e), debug=ui_settings.debug)
                 return False
         try:
+            originally_available_at = self.originally_available_at()
+            if not originally_available_at:
+                return True
             released = datetime.datetime.utcnow(
-            ) - datetime.datetime.strptime(self.originallyAvailableAt, '%Y-%m-%d')
+            ) - datetime.datetime.strptime(originally_available_at, '%Y-%m-%d')
             if released.days < 0:
                 return False
             return True
@@ -1202,7 +1227,7 @@ class media:
                                     str(self.year), str(year)), self.deviation(year=str(year))+"("+imdbID+")?")
                                 if len(self.Releases) < 20 and k == 0 and not imdb_scraped and not imdbID == ".":
                                     self.Releases += scraper.scrape(
-                                        imdbID, "(.*|"+imdbID+")")
+                                        imdbID, self.deviation(year=str(year)))
                                     imdb_scraped = True
                                 if len(self.Releases) > 0:
                                     break
@@ -1366,9 +1391,12 @@ class media:
             if len(self.Episodes) > 2:
                 if self.season_pack(scraped_releases):
                     debrid_downloaded, retry = self.debrid_download()
-                    # if scraper.traditional() or debrid_downloaded:
-                    for episode in self.Episodes:
-                        episode.skip_scraping = True
+                    # only skip individual episode scraping if a season pack was actually downloaded
+                    # (season_pack can return True on empty/no-match releases, which would otherwise
+                    # lock the episodes out of the per-episode fallback forever)
+                    if debrid_downloaded:
+                        for episode in self.Episodes:
+                            episode.skip_scraping = True
                 # If there was nothing downloaded, scrape specifically for this season
                 if not debrid_downloaded:
                     self.Releases = []
@@ -1590,6 +1618,11 @@ class media:
             ui_print("error: couldnt set release bitrate", ui_settings.debug)
 
     def season_pack(self, releases):
+        # nothing to evaluate: with no season releases and no episode releases the
+        # comparison below is vacuously true, which would trigger an empty download
+        # attempt and (previously) mark episodes as skip_scraping
+        if len(self.Releases) == 0 and len(releases) == 0:
+            return False
         season_releases = -1
         episode_releases = [-2] * len(self.Episodes)
         for release in self.Releases:

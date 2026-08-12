@@ -27,6 +27,25 @@ def set_log_dir(config):
     global config_dir
     config_dir = config
 
+def log_limit():
+    try:
+        return max(int(float(ui_settings.log_size)) * 1024 * 1024, 1024)
+    except:
+        return 10 * 1024 * 1024
+
+
+def rotate_log(path):
+    # rotate a log file to <path>.old once it exceeds the configured size
+    try:
+        if os.path.exists(path) and os.path.getsize(path) >= log_limit():
+            old = path + '.old'
+            if os.path.exists(old):
+                os.remove(old)
+            os.rename(path, old)
+    except:
+        pass
+
+
 def ui_print(string: str, debug="true"):
     global sameline
     global sameline_log
@@ -34,6 +53,7 @@ def ui_print(string: str, debug="true"):
         #log
         if ui_settings.log == "true":
             try:
+                rotate_log(config_dir + '/plex_debrid.log')
                 with open(config_dir + '/plex_debrid.log', 'a') as f:
                     if string == 'done' and sameline_log:
                         f.write('done' + '\n')

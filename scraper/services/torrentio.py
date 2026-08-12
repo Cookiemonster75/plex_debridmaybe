@@ -71,6 +71,7 @@ def scrape(query, altquery):
     scraped_releases = []
     if not 'torrentio' in active:
         return scraped_releases
+    filter_titles = not altquery == "(.*)"
     if altquery == "(.*)":
         altquery = query
     type = ("show" if regex.search(
@@ -153,6 +154,14 @@ def scrape(query, altquery):
         parsed = parse_stream(result)
         if parsed is None:
             continue
+        # filter out unrelated streams (torrentio can return keyword-matched
+        # results that are not this media item) - same as other scrapers do
+        if filter_titles:
+            try:
+                if not regex.match(r'(' + altquery + ')', parsed['title'], regex.I):
+                    continue
+            except:
+                continue
         scraped_releases += [releases.release(
             '[torrentio: ' + parsed['source'] + ']', 'torrent', parsed['title'], [], parsed['size'], [parsed['link']], parsed['seeds'])]
     return scraped_releases

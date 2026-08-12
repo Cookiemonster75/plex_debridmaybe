@@ -403,3 +403,11 @@ settings.json
 .env.*
 !.env.example
 freebuff.env
+
+# autostart launcher output
+console.log
+plex_debrid.log
+
+# local tooling / runtime caches
+.freebuff/
+plex_metadata.pkl
